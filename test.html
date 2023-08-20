@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width,initial-scale=1.0">
+	<title> GPT Voice Assistant  </title>
+	<script src='https://cdnjs.cloudflare.com/ajax/libs/showdown/2.1.0/showdown.min.js'></script>
+</head>
+<body>
+	<h1> ChatGPT 3.5 Voice Assistant </h1>
+	<button id="start-record" onclick="AudioRecorder.start()"> Start Record </button>
+	<button id="stop-record" onclick="AudioRecorder.stop()"> Stop Record </button>
+	<p id="output">
+	</p>
+	<script>
+		const markdownOutput = new showdown.Converter();
+		async function ChatGPT_request(audio_blob) {
+			const form = new FormData();
+			form.append('audio', audio_blob, "audio.wav");
+			const response = await fetch('http://localhost:5000/audiorequest', {
+				method: "POST",
+				body: form,
+			});
+			let data = await response.json()
+			writeOutput(markdownOutput.makeHtml(data.response));
+			console.log(data.transcription);
+		}
+
+
+		function writeOutput(text) {
+			let el = document.querySelector("#output");
+			el.innerHTML = text;
+		}
+
+		let AudioRecorder = {
+			mediaStream : null,
+			audioChunks: null ,
+			recording: false,
+			_start(stream) {
+				this.recording = true;
+				this.mediaStream = new MediaRecorder(stream);
+				this.mediaStream.ondataavailable = (e) => {
+					this.audioChunks.push(e.data);
+					console.log(this.audioChunks);
+					console.log(this.mediaStream.state);
+					const blob = new Blob(this.audioChunks, { type: "audio/ogg; codecs=opus" });
+					ChatGPT_request(blob);
+				}
+				this.mediaStream.start();
+				console.log(this.mediaStream.state);
+			},
+
+			start() {
+				if (this.recording) return;
+				if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+				  console.log("getUserMedia supported.");
+				  navigator.mediaDevices
+					.getUserMedia( { audio: true })
+						.then((stream) => this._start(stream))
+					// Error callback
+					.catch((err) =>
+						console.error(`The following getUserMedia error occurred: ${err}`)
+					);
+				} else {
+				  console.log("getUserMedia not supported on your browser!");
+					return;
+				}
+			},
+
+			stop() {
+				if (this.recording && this.mediaStream)  {
+					this.mediaStream.stop();
+					this.audioChunks = [];
+					this.recording = false;
+				}
+			}
+		}
+	</script>
+</body>
+</html>
