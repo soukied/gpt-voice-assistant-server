@@ -43,17 +43,17 @@
 			let unfinished_chunk = null;
 			while (true) {
 				const {done, value} = await reader.read();
-				let data = new TextDecoder().decode(value).replaceAll("data: ","").split("\n\n");
+				let data = new TextDecoder().decode(value).replaceAll("data:","").split("\n\n");
 				for (let content of data) {
 					if (unfinished_chunk) {
 						const sliced_content = unfinished_chunk + content;
 						unfinished_chunk = null;
-						const parsed_data = JSON.parse(sliced_content)
+						const parsed_data = JSON.parse(sliced_content.replaceAll('data:',''))
 						const output = parsed_data.choices[0].delta.content;
 						writeOutput(output ? output : "");
 						continue;
 				}
-					if (content == "" || content == "[DONE]") break;
+					if (content == "" || content == " [DONE]") break;
 					let sliced_content = content
 					try {
 						const parsed_data = JSON.parse(sliced_content)
