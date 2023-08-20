@@ -1,6 +1,7 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 from flask_cors import CORS, cross_origin
 from pyngrok import ngrok
+import time
 import requests
 import json
 import uuid
@@ -14,10 +15,26 @@ This is a request for ChatGPT.
 
 """
 
-MODEL_NAME = "base"
+MODEL_NAME = "small"
 app = Flask(__name__)
 cors = CORS(app)
+model = whisper.load_model(MODEL_NAME)
 app.config['CORS_HEADERS'] = 'Content-Type'
+
+def generate_data():
+    for i in range(1, 11):
+        time.sleep(1)
+        yield f"Data point {i}\n"
+        # Simulate some processing time
+
+@app.route('/stream')
+def stream_data():
+    return Response(generate_data(), mimetype='text/plain')
+
+def gpt_chunk_iterator(response):
+    for chunk in response.iter_content(chunk_size=1024):
+        chunk_str = chunk.decode('utf-8')
+        yield chunk_str
 
 def gpt_request(req_chat):
     url = 'https://free.churchless.tech/v1/chat/completions'
@@ -27,23 +44,22 @@ def gpt_request(req_chat):
         "stream":True
     }
 
-    response = requests.post(url, data=json.dumps(data_request), headers= {'Content-Type': 'application/json'}, stream=True)
+    response = requests.post(url, data=json.dumps(data_request), headers= {'Content-Type': 'application/javascript'}, stream=True)
 
     if response.status_code == 200:
-        response_chat = ""
-        for data in response.text.replace('\n\n', '\n').strip().split('\n')[:-2]:
-            data_obj = json.loads(data[6:])
-            delta = data_obj['choices'][0]['delta']
-            if 'content' in delta:
-                response_chat += delta['content']
-
-        print(response_chat)
-        return response_chat
+        return gpt_chunk_iterator(response), 200
+#        for data in response.text.replace('\n\n', '\n').strip().split('\n')[:-2]:
+#            data_obj = json.loads(data[6:])
+#            delta = data_obj['choices'][0]['delta']
+#            if 'content' in delta:
+#                response_chat += delta['content']
     else:
-        print("Failed to retrieve data. Status code:", response.status_code)
+        print(f"Gagal mengambil request dengan kode {response.status_code}, mengulang kembali. ")
+        def test():
+            yield "Error"
+        return test() ,response.status_code
 
 def whisper_transcribe(file_name):
-    model = whisper.load_model(MODEL_NAME)
     result = model.transcribe(file_name)
     return result["text"]
 
@@ -61,13 +77,16 @@ def transcribe_audio():
         with open(new_file_name, 'wb') as f:
             f.write(audio_content)
 
+        print("[Server] Transcribing Audio...")
         transcribed_text = whisper_transcribe(new_file_name)
         
         os.remove(new_file_name)
 
-        response_chat = gpt_request(transcribed_text)
+        response_chat, status_code = gpt_request(transcribed_text)
         
-        return jsonify({"transcription": transcribed_text, "response": response_chat }), 200
+        print("[Server] Writing response...")
+
+        return Response(response_chat, mimetype="text/plain"), status_code
     
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -76,9 +95,16 @@ def transcribe_audio():
 @cross_origin()
 def chat_request():
     chat_request = request.form['content']
-    response = gpt_request(chat_request)
-    return jsonify({"chat": response}), 200
+    response, error_code = gpt_request(chat_request)
+    return Response(response, mimetype="text/plain"), error_code
 
+@app.route('/')
+@cross_origin()
+def index():
+    index_html = ""
+    with open('test.html') as file:
+        index_html = file.read()
+    return index_html
 if __name__ == '__main__':
     ngrok_key = os.getenv("NGROK")
     if ngrok_key:
