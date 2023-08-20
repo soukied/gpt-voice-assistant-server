@@ -7,29 +7,68 @@
 	<script src='https://cdnjs.cloudflare.com/ajax/libs/showdown/2.1.0/showdown.min.js'></script>
 </head>
 <body>
-	<h1> ChatGPT 3.5 Voice Assistant </h1>
+	<h1> GPT 3.5 dengan suara </h1>
 	<button id="start-record" onclick="AudioRecorder.start()"> Start Record </button>
 	<button id="stop-record" onclick="AudioRecorder.stop()"> Stop Record </button>
 	<p id="output">
 	</p>
 	<script>
-		const markdownOutput = new showdown.Converter();
+		let fetching_data = false;
+
+		const [writeOutput, clearOutput]  = (()=>{
+			let output = "";
+			let converter = new showdown.Converter();
+			let element = document.querySelector("#output");
+			return [
+				(newOutput) =>{
+					output += newOutput;
+					element.innerHTML = converter.makeHtml(output);
+				},
+				() => {
+					element.innerHTML = "";
+					output = "";
+				}
+			]
+		})();
+
 		async function ChatGPT_request(audio_blob) {
+			clearOutput();
 			const form = new FormData();
 			form.append('audio', audio_blob, "audio.wav");
-			const response = await fetch('http://localhost:5000/audiorequest', {
+			const response = await fetch('http://localhost:3000/audiorequest', {
 				method: "POST",
 				body: form,
 			});
-			let data = await response.json()
-			writeOutput(markdownOutput.makeHtml(data.response));
-			console.log(data.transcription);
-		}
-
-
-		function writeOutput(text) {
-			let el = document.querySelector("#output");
-			el.innerHTML = text;
+			const reader = response.body.getReader();
+			let unfinished_chunk = null;
+			while (true) {
+				const {done, value} = await reader.read();
+				let data = new TextDecoder().decode(value).replaceAll("data: ","").split("\n\n");
+				for (let content of data) {
+					if (unfinished_chunk) {
+						const sliced_content = unfinished_chunk + content;
+						unfinished_chunk = null;
+						const parsed_data = JSON.parse(sliced_content)
+						const output = parsed_data.choices[0].delta.content;
+						writeOutput(output ? output : "");
+						continue;
+				}
+					if (content == "" || content == "[DONE]") break;
+					let sliced_content = content
+					try {
+						const parsed_data = JSON.parse(sliced_content)
+						const output = parsed_data.choices[0].delta.content;
+						writeOutput(output ? output : "");
+					} catch(e) {
+						unfinished_chunk = sliced_content;
+						console.error("Data parsing yang salah: " + content);
+					}
+				}
+				if (done) {
+					console.log("Selesai fetching");
+					break;
+				}
+			}
 		}
 
 		let AudioRecorder = {
