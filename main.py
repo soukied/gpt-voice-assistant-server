@@ -82,6 +82,7 @@ def chat_request():
 if __name__ == '__main__':
     ngrok_key = os.getenv("NGROK")
     if ngrok_key:
-        tunnel = ngrok.connect(PORT, authtoken=ngrok_key)
-        print (f"Ingress established at {tunnel.url()}")
+        ngrok.set_auth_token(ngrok_key)
+        tunnel = ngrok.connect(PORT).public_url
+        print (f"Ingress established at {tunnel}")
     app.run(debug=True, port=PORT)
