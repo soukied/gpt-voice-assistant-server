@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
-import ngrok
+from pyngrok import ngrok
 import requests
 import json
 import uuid
