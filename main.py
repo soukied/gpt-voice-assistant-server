@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS, cross_origin
 from pyngrok import ngrok
@@ -9,13 +10,8 @@ import os
 import whisper
 
 PORT = 3000
-
-data = """
-This is a request for ChatGPT.
-
-"""
-
 MODEL_NAME = "small"
+
 app = Flask(__name__)
 cors = CORS(app)
 model = whisper.load_model(MODEL_NAME)
@@ -83,6 +79,8 @@ def transcribe_audio():
         os.remove(new_file_name)
 
         response_chat, status_code = gpt_request(transcribed_text)
+        if status_code != 200:
+            response_chat, status_code = gpt_request(transcribed_text)
         
         print("[Server] Writing response...")
 
@@ -105,6 +103,7 @@ def index():
     with open('test.html') as file:
         index_html = file.read()
     return index_html
+
 if __name__ == '__main__':
     ngrok_key = os.getenv("NGROK")
     if ngrok_key:
