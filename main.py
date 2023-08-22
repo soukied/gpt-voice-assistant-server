@@ -2,7 +2,6 @@
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS, cross_origin
 from pyngrok import ngrok
-import time
 import requests
 import json
 import uuid
@@ -16,16 +15,6 @@ app = Flask(__name__)
 cors = CORS(app)
 model = whisper.load_model(MODEL_NAME)
 app.config['CORS_HEADERS'] = 'Content-Type'
-
-def generate_data():
-    for i in range(1, 11):
-        time.sleep(1)
-        yield f"Data point {i}\n"
-        # Simulate some processing time
-
-@app.route('/stream')
-def stream_data():
-    return Response(generate_data(), mimetype='text/plain')
 
 def gpt_chunk_iterator(response):
     for chunk in response.iter_content(chunk_size=1024):
