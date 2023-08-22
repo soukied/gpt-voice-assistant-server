@@ -82,6 +82,7 @@ def transcribe_audio():
 @cross_origin()
 def chat_request():
     chat_request = request.form['content']
+    print("[Server] Writing response...")
     response, error_code = gpt_request(chat_request)
     return Response(response, mimetype="text/plain"), error_code
 
